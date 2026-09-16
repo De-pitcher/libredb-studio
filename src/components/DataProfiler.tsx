@@ -2,7 +2,38 @@
 
 import { appFetch } from "@/lib/config/base-path";
 import { useState, useEffect, useMemo } from "react";
-import { LoaderCircle, ChartColumn, X, Hash, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
+import { LoaderCircle, ChartColumn, X, Hash, Type, Calendar, ToggleLeft, Braces, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
+
+function getColumnIcon(type?: string) {
+  if (!type) return Hash;
+  const t = type.toLowerCase();
+  if (
+    t.includes("int") ||
+    t.includes("number") ||
+    t.includes("numeric") ||
+    t.includes("decimal") ||
+    t.includes("float") ||
+    t.includes("double") ||
+    t.includes("real") ||
+    t.includes("serial") ||
+    t.includes("money")
+  ) {
+    return Hash;
+  }
+  if (t.includes("char") || t.includes("text") || t.includes("string") || t.includes("varchar") || t.includes("enum")) {
+    return Type;
+  }
+  if (t.includes("date") || t.includes("time") || t.includes("timestamp")) {
+    return Calendar;
+  }
+  if (t.includes("bool") || t.includes("bit")) {
+    return ToggleLeft;
+  }
+  if (t.includes("json") || t.includes("xml")) {
+    return Braces;
+  }
+  return Hash;
+}
 import { cn } from "@/lib/utils";
 import { DatabaseConnection } from "@/lib/types";
 import { objectPathLabel, pathKey } from "@/lib/db/object-path";
@@ -323,12 +354,14 @@ export function DataProfiler({
                 {/* Column Profiles */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-medium text-fg-tertiary">Column Profiles</h3>
-                  {profile.columns.map((col) => (
-                    <div key={col.name} className="bg-surface rounded-lg p-3 border border-hairline">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Hash strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
-                          <span className="text-xs font-medium text-fg">{col.name}</span>
+                  {profile.columns.map((col) => {
+                    const ColumnIcon = getColumnIcon(col.type);
+                    return (
+                      <div key={col.name} className="bg-surface rounded-lg p-3 border border-hairline">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ColumnIcon strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
+                            <span className="text-xs font-medium text-fg">{col.name}</span>
                           {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
                           {sensitiveColumnNames.has(col.name) && (
                             <span title="Sensitive column - values masked">
@@ -429,7 +462,8 @@ export function DataProfiler({
                         </>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
 
                 {/* AI Summary */}

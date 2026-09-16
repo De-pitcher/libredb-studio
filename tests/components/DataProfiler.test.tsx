@@ -979,4 +979,39 @@ describe("DataProfiler", () => {
       download.restore();
     }
   });
+
+  // ── Dynamic column type icons (#880) ─────────────────────────────────────
+
+  test("renders column type icons dynamically based on column type (#880)", async () => {
+    const profileWithMixedTypes = {
+      tableName: "mixed",
+      totalRows: 10,
+      columns: [
+        { name: "num_col", type: "integer", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "text_col", type: "varchar(255)", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "date_col", type: "timestamp", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 10 },
+        { name: "bool_col", type: "boolean", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 2 },
+        { name: "json_col", type: "jsonb", totalRows: 10, nullCount: 0, nullPercent: 0, distinctCount: 5 },
+      ],
+    };
+
+    restoreGlobalFetch();
+    mockGlobalFetch({
+      "/api/db/profile": { ok: true, json: profileWithMixedTypes },
+      "/api/ai/describe-schema": { ok: false, status: 500, json: { error: "AI not configured" } },
+    });
+
+    const props = createDefaultProps();
+    const { container } = render(<DataProfiler {...props} />);
+
+    await waitFor(() => {
+      expect(within(container).queryByText("Column Profiles")).not.toBeNull();
+    });
+
+    expect(within(container).queryByText("num_col")).not.toBeNull();
+    expect(within(container).queryByText("text_col")).not.toBeNull();
+    expect(within(container).queryByText("date_col")).not.toBeNull();
+    expect(within(container).queryByText("bool_col")).not.toBeNull();
+    expect(within(container).queryByText("json_col")).not.toBeNull();
+  });
 });
