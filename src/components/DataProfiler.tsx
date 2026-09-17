@@ -2,7 +2,20 @@
 
 import { appFetch } from "@/lib/config/base-path";
 import { useState, useEffect, useMemo } from "react";
-import { LoaderCircle, ChartColumn, X, Hash, Type, Calendar, ToggleLeft, Braces, CircleAlert, Sparkles, Lock, Download } from "lucide-react";
+import {
+  LoaderCircle,
+  ChartColumn,
+  X,
+  Hash,
+  Type,
+  Calendar,
+  ToggleLeft,
+  Braces,
+  CircleAlert,
+  Sparkles,
+  Lock,
+  Download,
+} from "lucide-react";
 
 function getColumnIcon(type?: string) {
   if (!type) return Hash;
@@ -362,108 +375,108 @@ export function DataProfiler({
                           <div className="flex items-center gap-2">
                             <ColumnIcon strokeWidth={1.5} className="w-3 h-3 text-hue-blue" />
                             <span className="text-xs font-medium text-fg">{col.name}</span>
-                          {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
-                          {sensitiveColumnNames.has(col.name) && (
-                            <span title="Sensitive column - values masked">
-                              <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
-                            </span>
-                          )}
+                            {col.type && <span className="text-xs text-fg-muted font-mono">{col.type}</span>}
+                            {sensitiveColumnNames.has(col.name) && (
+                              <span title="Sensitive column - values masked">
+                                <Lock strokeWidth={1.5} className="w-3 h-3 text-hue-purple" />
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-fg-muted">{col.distinctCount.toLocaleString()} distinct</span>
                         </div>
-                        <span className="text-xs text-fg-muted">{col.distinctCount.toLocaleString()} distinct</span>
-                      </div>
 
-                      {col.error ? (
-                        <p className="text-xs text-warning">{col.error}</p>
-                      ) : (
-                        <>
-                          {/* Null bar */}
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className="flex-1 h-1.5 bg-overlay rounded-full overflow-hidden">
-                              <div
+                        {col.error ? (
+                          <p className="text-xs text-warning">{col.error}</p>
+                        ) : (
+                          <>
+                            {/* Null bar */}
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div className="flex-1 h-1.5 bg-overlay rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    col.nullPercent > 50
+                                      ? "bg-danger-tint"
+                                      : col.nullPercent > 20
+                                        ? "bg-warning-tint"
+                                        : "bg-success-tint",
+                                  )}
+                                  style={{ width: `${100 - col.nullPercent}%` }}
+                                />
+                              </div>
+                              <span
                                 className={cn(
-                                  "h-full rounded-full transition-all",
+                                  "text-xs font-mono w-10 text-right",
                                   col.nullPercent > 50
-                                    ? "bg-danger-tint"
+                                    ? "text-danger"
                                     : col.nullPercent > 20
-                                      ? "bg-warning-tint"
-                                      : "bg-success-tint",
+                                      ? "text-warning"
+                                      : "text-success",
                                 )}
-                                style={{ width: `${100 - col.nullPercent}%` }}
-                              />
+                              >
+                                {col.nullPercent}% null
+                              </span>
                             </div>
-                            <span
-                              className={cn(
-                                "text-xs font-mono w-10 text-right",
-                                col.nullPercent > 50
-                                  ? "text-danger"
-                                  : col.nullPercent > 20
-                                    ? "text-warning"
-                                    : "text-success",
-                              )}
-                            >
-                              {col.nullPercent}% null
-                            </span>
-                          </div>
 
-                          {/* Min/Max */}
-                          <div className="flex gap-4 text-xs">
-                            {col.minValue &&
-                              (() => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(col.minValue, rule) : col.minValue.substring(0, 30);
-                                return (
-                                  <span className="text-fg-muted">
-                                    min:{" "}
+                            {/* Min/Max */}
+                            <div className="flex gap-4 text-xs">
+                              {col.minValue &&
+                                (() => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(col.minValue, rule) : col.minValue.substring(0, 30);
+                                  return (
+                                    <span className="text-fg-muted">
+                                      min:{" "}
+                                      <span
+                                        className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      >
+                                        {display}
+                                      </span>
+                                    </span>
+                                  );
+                                })()}
+                              {col.maxValue &&
+                                (() => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(col.maxValue, rule) : col.maxValue.substring(0, 30);
+                                  return (
+                                    <span className="text-fg-muted">
+                                      max:{" "}
+                                      <span
+                                        className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      >
+                                        {display}
+                                      </span>
+                                    </span>
+                                  );
+                                })()}
+                            </div>
+
+                            {/* Sample Values */}
+                            {col.sampleValues && col.sampleValues.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {col.sampleValues.map((val, i) => {
+                                  const rule = sensitiveColumnNames.get(col.name);
+                                  const display = rule ? maskValue(val, rule) : val.substring(0, 20);
+                                  return (
                                     <span
-                                      className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
+                                      key={i}
+                                      className={cn(
+                                        "text-xs px-1.5 py-0.5 bg-overlay rounded font-mono",
+                                        rule ? "text-fg-muted italic" : "text-fg-tertiary",
+                                      )}
                                     >
                                       {display}
                                     </span>
-                                  </span>
-                                );
-                              })()}
-                            {col.maxValue &&
-                              (() => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(col.maxValue, rule) : col.maxValue.substring(0, 30);
-                                return (
-                                  <span className="text-fg-muted">
-                                    max:{" "}
-                                    <span
-                                      className={cn("font-mono", rule ? "text-fg-muted italic" : "text-fg-tertiary")}
-                                    >
-                                      {display}
-                                    </span>
-                                  </span>
-                                );
-                              })()}
-                          </div>
-
-                          {/* Sample Values */}
-                          {col.sampleValues && col.sampleValues.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {col.sampleValues.map((val, i) => {
-                                const rule = sensitiveColumnNames.get(col.name);
-                                const display = rule ? maskValue(val, rule) : val.substring(0, 20);
-                                return (
-                                  <span
-                                    key={i}
-                                    className={cn(
-                                      "text-xs px-1.5 py-0.5 bg-overlay rounded font-mono",
-                                      rule ? "text-fg-muted italic" : "text-fg-tertiary",
-                                    )}
-                                  >
-                                    {display}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* AI Summary */}
