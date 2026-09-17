@@ -817,4 +817,35 @@ describe("OverviewTab", () => {
     expect(bg).toBe("#ffffff");
     expect(color).toBe("#3f3f46");
   });
+
+  // ── Health gauge track background ───────────────────────────────────────────
+
+  async function gaugeTrackFillUnderTheme(theme: "dark" | "light") {
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(theme);
+    mockGlobalFetch({ "/api/admin/audit": { ok: true, json: { events: [] } } });
+
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<OverviewTab user={{ username: "admin", role: "admin" }} />);
+    });
+    const radialBars = result!.container.querySelectorAll("[data-testid='mock-radial-bar']");
+    return Array.from(radialBars).map((bar) => bar.getAttribute("data-bg"));
+  }
+
+  test("health and metric gauges use dark grid color for background track in dark theme", async () => {
+    const fills = await gaugeTrackFillUnderTheme("dark");
+    expect(fills.length).toBeGreaterThan(0);
+    for (const fill of fills) {
+      expect(fill).toBe("#222222");
+    }
+  });
+
+  test("health and metric gauges use light grid color for background track in light theme", async () => {
+    const fills = await gaugeTrackFillUnderTheme("light");
+    expect(fills.length).toBeGreaterThan(0);
+    for (const fill of fills) {
+      expect(fill).toBe("#e4e4e7");
+    }
+  });
 });
