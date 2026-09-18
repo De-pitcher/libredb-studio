@@ -39,6 +39,7 @@ import {
   assessProvenance,
   extractArchive,
   DEFAULT_PORT,
+  resolveLauncherHost,
   startupUrl,
   LauncherUsageError,
   parseLauncherArgs,
@@ -296,8 +297,8 @@ function verifyProvenance(archivePath, name) {
 
 /**
  * Spawn `node server.js` from the payload, forwarding the full environment.
- * Local-first: without --host/HOSTNAME the server binds to loopback only
- * (the standalone Next server would otherwise default to 0.0.0.0).
+ * Local-first: without --host or an explicit HOSTNAME (differing from the
+ * machine/container hostname), the server binds to loopback only (issue #813).
  *
  * @param {string} payloadDir
  * @param {number | null} port
@@ -306,8 +307,13 @@ function verifyProvenance(archivePath, name) {
 function startServer(payloadDir, port, host) {
   const env = { ...process.env };
   if (port !== null) env.PORT = String(port);
-  if (host !== null) env.HOSTNAME = host;
-  if (!env.HOSTNAME) env.HOSTNAME = "127.0.0.1";
+  let systemHostname = "";
+  try {
+    systemHostname = os.hostname();
+  } catch {
+    systemHostname = "";
+  }
+  env.HOSTNAME = resolveLauncherHost(host, env.HOSTNAME, systemHostname);
   if (!env.NODE_ENV) env.NODE_ENV = "production";
   // The agent's run history (#331 T5). The server is spawned with cwd set to the
   // payload directory, so the workflow SDK's cwd-relative default would put the

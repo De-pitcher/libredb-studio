@@ -96,12 +96,13 @@ address family either one selects.
 For anything reachable from a network, prefer a reverse proxy with TLS in front and strict mode
 (`AUTH_BOOTSTRAP=off`) with explicit credentials.
 
-A direct run of the `.deb`/`.rpm` wrapper, the Homebrew binary or the snap launcher ignores any
-inherited `HOSTNAME` (empty, or - under Docker - the container ID Next.js would otherwise bind to)
-and defaults to loopback; `LIBREDB_BIND` is the explicit opt-in for that case. Under systemd,
-`HOSTNAME` in `/etc/libredb-studio/env` or the snap unit's drop-in is still the override, since the
-unit resolves it before the wrapper runs (detected via the systemd-set `INVOCATION_ID`, so the
-wrapper leaves it untouched there). The
+The npx launcher, a direct run of the `.deb`/`.rpm` wrapper, the Homebrew binary or the snap
+launcher ignores any inherited `HOSTNAME` (empty, or - under Docker - the container ID Next.js
+would otherwise bind to) and defaults to loopback; for npx, `--host` or an explicit `HOSTNAME`
+differing from the container ID is the opt-in, while `LIBREDB_BIND` is the explicit opt-in for the
+wrappers. Under systemd, `HOSTNAME` in `/etc/libredb-studio/env` or the snap unit's drop-in is still
+the override, since the unit resolves it before the wrapper runs (detected via the systemd-set
+`INVOCATION_ID`, so the wrapper leaves it untouched there). The
 Windows launcher rebuilds `HOSTNAME` from `LIBREDB_BIND` on every run, with no systemd exception.
 
 **Address family (IPv4, IPv6, dual-stack).** The bind address accepts an IPv6 literal in every

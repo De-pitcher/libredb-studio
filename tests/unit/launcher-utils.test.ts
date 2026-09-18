@@ -21,6 +21,7 @@ import {
   preservePayloadData,
   releaseDownloadUrl,
   resolveCacheDir,
+  resolveLauncherHost,
   resolveLedgerDir,
   sha256File,
 } from "../../bin/lib/launcher-utils.mjs";
@@ -597,6 +598,49 @@ describe("startupUrl", () => {
   });
 });
 
+describe("resolveLauncherHost", () => {
+  const CONTAINER_ID = "46db4676bb04";
+  const POD_NAME = "libredb-studio-7c9f5b8d64-2xqkz";
+
+  test("explicit CLI --host always wins over inherited or custom env HOSTNAME", () => {
+    expect(resolveLauncherHost("0.0.0.0", CONTAINER_ID, CONTAINER_ID)).toBe("0.0.0.0");
+    expect(resolveLauncherHost("127.0.0.1", "0.0.0.0", CONTAINER_ID)).toBe("127.0.0.1");
+    expect(resolveLauncherHost("::1", undefined, CONTAINER_ID)).toBe("::1");
+  });
+
+  test("explicit CLI --host is respected even when it equals the container/system hostname", () => {
+    expect(resolveLauncherHost(CONTAINER_ID, CONTAINER_ID, CONTAINER_ID)).toBe(CONTAINER_ID);
+  });
+
+  test("trims whitespace from explicit CLI --host", () => {
+    expect(resolveLauncherHost("  0.0.0.0  ", undefined, CONTAINER_ID)).toBe("0.0.0.0");
+  });
+
+  test("explicit env HOSTNAME differing from system hostname is respected (issue #813)", () => {
+    expect(resolveLauncherHost(null, "0.0.0.0", CONTAINER_ID)).toBe("0.0.0.0");
+    expect(resolveLauncherHost(null, "::", CONTAINER_ID)).toBe("::");
+    expect(resolveLauncherHost(null, "192.168.1.50", CONTAINER_ID)).toBe("192.168.1.50");
+  });
+
+  test("trims whitespace from explicit env HOSTNAME", () => {
+    expect(resolveLauncherHost(null, "  0.0.0.0 \n", CONTAINER_ID)).toBe("0.0.0.0");
+  });
+
+  test("Docker injected container id matching system hostname is ignored and defaults to loopback (issue #813)", () => {
+    expect(resolveLauncherHost(null, CONTAINER_ID, CONTAINER_ID)).toBe("127.0.0.1");
+    expect(resolveLauncherHost(null, `  ${CONTAINER_ID}\n`, CONTAINER_ID)).toBe("127.0.0.1");
+  });
+
+  test("Kubernetes injected pod name matching system hostname is ignored and defaults to loopback", () => {
+    expect(resolveLauncherHost(null, POD_NAME, POD_NAME)).toBe("127.0.0.1");
+  });
+
+  test.each([undefined, null, "", "   "])("empty or unset env HOSTNAME (%p) defaults to loopback", (envVal) => {
+    expect(resolveLauncherHost(null, envVal, CONTAINER_ID)).toBe("127.0.0.1");
+    expect(resolveLauncherHost(null, envVal, "")).toBe("127.0.0.1");
+  });
+});
+
 /**
  * The pure table above covers every formatting rule; these three cases cover the
  * wiring, that `bin/studio.js` passes the real HOSTNAME and PORT through the helper
@@ -665,5 +709,79 @@ describe("launcher startup URL", () => {
     expect(output).toContain(`Starting LibreDB Studio ${version} on ${url}\n`);
     expect(output).toContain(`BIND=${host}\n`);
     expect(output.match(/^Starting LibreDB Studio ([0-9][0-9.]*) /m)?.[1]).toBe(version);
+  });
+});
+
+describe("launcher container hostname bind (issue #813)", () => {
+  test("ignores inherited container HOSTNAME matching system hostname and binds to loopback", () => {
+    const node = Bun.which("node");
+    expect(node).not.toBeNull();
+    const ambient = Bun.spawnSync([node!, "-p", "process.versions.node"]).stdout.toString().trim();
+    expect(assessNodeRuntime(ambient).message).toBeNull();
+
+    const home = fs.mkdtempSync(path.join(tempDir, "container-bind-"));
+    const root = path.resolve(import.meta.dir, "../..");
+    const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+    const payload = path.join(home, ".libredb-studio", version, "payload");
+    fs.mkdirSync(payload, { recursive: true });
+    fs.writeFileSync(path.join(payload, "server.js"), 'console.log("BIND=" + process.env.HOSTNAME);');
+    const preload = path.join(home, "preload-fixture.mjs");
+    const containerId = "46db4676bb04";
+    fs.writeFileSync(
+      preload,
+      'import os from "node:os"; import { syncBuiltinESMExports } from "node:module"; ' +
+        `os.homedir = () => ${JSON.stringify(home)}; os.hostname = () => ${JSON.stringify(containerId)}; syncBuiltinESMExports();`,
+    );
+
+    const env = { ...process.env };
+    delete env.PORT;
+    delete env.LIBREDB_STUDIO_ARCHIVE;
+    env.HOSTNAME = containerId;
+
+    const run = Bun.spawnSync([node!, "--import", pathToFileURL(preload).href, path.join(root, "bin/studio.js")], {
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(run.exitCode, `launcher stderr: ${run.stderr.toString()}`).toBe(0);
+    const output = run.stdout.toString();
+    expect(output).toContain(`Starting LibreDB Studio ${version} on http://127.0.0.1:3000\n`);
+    expect(output).toContain("BIND=127.0.0.1\n");
+  });
+
+  test("respects explicit HOSTNAME differing from container hostname", () => {
+    const node = Bun.which("node");
+    expect(node).not.toBeNull();
+    const ambient = Bun.spawnSync([node!, "-p", "process.versions.node"]).stdout.toString().trim();
+    expect(assessNodeRuntime(ambient).message).toBeNull();
+
+    const home = fs.mkdtempSync(path.join(tempDir, "explicit-bind-"));
+    const root = path.resolve(import.meta.dir, "../..");
+    const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+    const payload = path.join(home, ".libredb-studio", version, "payload");
+    fs.mkdirSync(payload, { recursive: true });
+    fs.writeFileSync(path.join(payload, "server.js"), 'console.log("BIND=" + process.env.HOSTNAME);');
+    const preload = path.join(home, "preload-fixture.mjs");
+    const containerId = "46db4676bb04";
+    fs.writeFileSync(
+      preload,
+      'import os from "node:os"; import { syncBuiltinESMExports } from "node:module"; ' +
+        `os.homedir = () => ${JSON.stringify(home)}; os.hostname = () => ${JSON.stringify(containerId)}; syncBuiltinESMExports();`,
+    );
+
+    const env = { ...process.env };
+    delete env.PORT;
+    delete env.LIBREDB_STUDIO_ARCHIVE;
+    env.HOSTNAME = "0.0.0.0";
+
+    const run = Bun.spawnSync([node!, "--import", pathToFileURL(preload).href, path.join(root, "bin/studio.js")], {
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(run.exitCode, `launcher stderr: ${run.stderr.toString()}`).toBe(0);
+    const output = run.stdout.toString();
+    expect(output).toContain(`Starting LibreDB Studio ${version} on http://127.0.0.1:3000\n`);
+    expect(output).toContain("BIND=0.0.0.0\n");
   });
 });

@@ -27,6 +27,29 @@ export function startupUrl(hostname, port) {
 }
 
 /**
+ * Resolve the bind address for the launcher's spawned server (issue #813).
+ *
+ * Local-first: an explicit `--host` CLI flag always wins. If not provided, an
+ * operator's explicit `HOSTNAME` environment variable is respected only when
+ * it differs from the system hostname (`os.hostname()`); otherwise, an inherited
+ * container ID or pod name (which Docker/Kubernetes always injects as HOSTNAME)
+ * is ignored and the local-first loopback default (`127.0.0.1`) applies.
+ *
+ * @param {string | null | undefined} cliHost
+ * @param {string | null | undefined} envHostname
+ * @param {string | null | undefined} systemHostname
+ * @returns {string}
+ */
+export function resolveLauncherHost(cliHost, envHostname, systemHostname) {
+  const rawCli = typeof cliHost === "string" ? cliHost.trim() : "";
+  if (rawCli) return rawCli;
+  const rawEnv = typeof envHostname === "string" ? envHostname.trim() : "";
+  const rawSys = typeof systemHostname === "string" ? systemHostname.trim() : "";
+  if (rawEnv && rawEnv !== rawSys) return rawEnv;
+  return "127.0.0.1";
+}
+
+/**
  * Platform/arch pairs the release workflow builds standalone payloads for
  * (must mirror the build jobs in .github/workflows/release-artifacts.yml).
  */
