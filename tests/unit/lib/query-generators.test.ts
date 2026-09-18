@@ -49,7 +49,17 @@ describe("generateTableQuery", () => {
   test("JSON (MongoDB) generates JSON find query", () => {
     const result = generateTableQuery(["users"], makeCaps({ queryLanguage: "json", defaultPort: null }));
     const parsed = JSON.parse(result);
+    expect(parsed.database).toBeUndefined();
     expect(parsed.collection).toBe("users");
+    expect(parsed.operation).toBe("find");
+    expect(parsed.options.limit).toBe(50);
+  });
+
+  test("JSON (MongoDB) generates JSON find query with explicit database when path is qualified", () => {
+    const result = generateTableQuery(["analytics", "events"], makeCaps({ queryLanguage: "json", defaultPort: null }));
+    const parsed = JSON.parse(result);
+    expect(parsed.database).toBe("analytics");
+    expect(parsed.collection).toBe("events");
     expect(parsed.operation).toBe("find");
     expect(parsed.options.limit).toBe(50);
   });
@@ -267,7 +277,22 @@ describe("generateSelectQuery", () => {
       makeCaps({ queryLanguage: "json", defaultPort: null }),
     );
     const parsed = JSON.parse(result);
+    expect(parsed.database).toBeUndefined();
     expect(parsed.collection).toBe("users");
+    expect(parsed.options.projection.id).toBe(1);
+    expect(parsed.options.projection.name).toBe(1);
+    expect(parsed.options.limit).toBe(100);
+  });
+
+  test("JSON (MongoDB) generateSelectQuery includes database when path is qualified", () => {
+    const result = generateSelectQuery(
+      ["analytics", "events"],
+      sampleColumns,
+      makeCaps({ queryLanguage: "json", defaultPort: null }),
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.database).toBe("analytics");
+    expect(parsed.collection).toBe("events");
     expect(parsed.options.projection.id).toBe(1);
     expect(parsed.options.projection.name).toBe(1);
     expect(parsed.options.limit).toBe(100);
@@ -1143,18 +1168,21 @@ describe("the generated statement addresses an object by its path", () => {
 // ============================================================================
 
 describe("the dialects that address one key or collection, not a qualified name", () => {
-  test("MongoDB names the COLLECTION, not the database that holds it", () => {
-    // A collection's path is [database, collection] (`MONGODB_CONTAINER_LEVELS`), and the
-    // driver takes the collection name alone: `db.collection("sample_shop.users")` would
-    // create a collection literally called that.
+  test("MongoDB carries the target database and bare collection (#843)", () => {
+    // A collection's path is [database, collection] (`MONGODB_CONTAINER_LEVELS`).
+    // The query generator emits database as a separate key so the provider targets the
+    // intended database, while the collection name stays un-prefixed (#843).
     const out = generateTableQuery(["sample_shop", "users"], makeCaps({ queryLanguage: "json", defaultPort: null }));
-    expect(JSON.parse(out).collection).toBe("users");
-    expect(out).not.toContain("sample_shop");
+    const parsed = JSON.parse(out);
+    expect(parsed.database).toBe("sample_shop");
+    expect(parsed.collection).toBe("users");
   });
 
-  test("MongoDB's Generate Query names the collection too", () => {
+  test("MongoDB's Generate Query carries the target database and bare collection too (#843)", () => {
     const caps = makeCaps({ queryLanguage: "json", defaultPort: null });
-    expect(JSON.parse(generateSelectQuery(["sample_shop", "users"], sampleColumns, caps)).collection).toBe("users");
+    const parsed = JSON.parse(generateSelectQuery(["sample_shop", "users"], sampleColumns, caps));
+    expect(parsed.database).toBe("sample_shop");
+    expect(parsed.collection).toBe("users");
   });
 
   test("Redis takes the bare key, never the database segment with it", () => {

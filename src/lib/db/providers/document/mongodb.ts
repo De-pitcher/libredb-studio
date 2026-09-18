@@ -63,6 +63,7 @@ import { CACHE_HIT_RATIO_UNAVAILABLE, formatCacheHitRatio, measuredNumber } from
 // ============================================================================
 
 interface MongoQuery {
+  database?: string;
   collection: string;
   operation:
     | "find"
@@ -682,7 +683,7 @@ export class MongoDBProvider extends BaseDatabaseProvider {
       // it excludes: naming only what the language IS did not survive contact with
       // the model's prior on Elasticsearch, and does not here either.
       statementLanguage:
-        'the JSON command object this editor executes - {"collection": "<name>", "operation": "find" | "findOne" | "aggregate" | "count" | "distinct", "filter": {...}, "pipeline": [...], "field": "<name>" (distinct only), "options": {"limit": 50}} - and NOT mongosh shell syntax: a statement that starts with `db.` cannot be run here',
+        'the JSON command object this editor executes - {"database": "<name>" (optional), "collection": "<name>", "operation": "find" | "findOne" | "aggregate" | "count" | "distinct", "filter": {...}, "pipeline": [...], "field": "<name>" (distinct only), "options": {"limit": 50}} - and NOT mongosh shell syntax: a statement that starts with `db.` cannot be run here',
       // `getSlowQueries()` reads `system.profile`, which does not exist until the
       // profiler is switched on - so the empty panel is the ordinary case here, and it
       // used to name a PostgreSQL extension (#463).
@@ -705,9 +706,6 @@ export class MongoDBProvider extends BaseDatabaseProvider {
     if (!this.config.connectionString) {
       if (!this.config.host) {
         throw new DatabaseConfigError("Host or connection string is required for MongoDB", "mongodb");
-      }
-      if (!this.config.database) {
-        throw new DatabaseConfigError("Database name is required for MongoDB", "mongodb");
       }
     }
   }
@@ -844,8 +842,11 @@ export class MongoDBProvider extends BaseDatabaseProvider {
    * Accepts JSON-formatted MQL queries
    *
    * @example
-   * // Find documents
+   * // Find documents in session database
    * {"collection": "users", "operation": "find", "filter": {"age": {"$gt": 18}}, "options": {"limit": 10}}
+   *
+   * // Find documents in explicit database
+   * {"database": "analytics", "collection": "events", "operation": "find", "filter": {}, "options": {"limit": 10}}
    *
    * // Aggregate
    * {"collection": "orders", "operation": "aggregate", "pipeline": [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]}
@@ -860,7 +861,8 @@ export class MongoDBProvider extends BaseDatabaseProvider {
       const { result, executionTime } = await this.measureExecution(async () => {
         try {
           const query = this.parseQuery(queryStr);
-          const collection = this.db!.collection(query.collection);
+          const db = query.database ? this.client!.db(query.database) : this.db!;
+          const collection = db.collection(query.collection);
 
           if (!SUPPORTED_OPERATIONS.has(query.operation)) {
             throw new QueryError(`Unsupported operation: ${query.operation}`, "mongodb");
@@ -999,7 +1001,13 @@ export class MongoDBProvider extends BaseDatabaseProvider {
       // Try to parse as JSON
       const parsed = JSON.parse(queryStr.trim());
 
-      if (!parsed.collection) {
+      if (parsed.database !== undefined && (typeof parsed.database !== "string" || !parsed.database.trim())) {
+        throw new QueryError(
+          'Invalid MongoDB query format. "database" must be a non-empty string when provided.',
+          "mongodb",
+        );
+      }
+      if (!parsed.collection || typeof parsed.collection !== "string") {
         throw new QueryError("Collection name is required in query", "mongodb");
       }
       if (!parsed.operation) {

@@ -417,7 +417,18 @@ export function generateTableQuery(
     return renderRedisCommand(keyType ? REDIS_COMMANDS[keyType].read(base) : ["TYPE", base]);
   }
   if (capabilities.queryLanguage === "json") {
-    return JSON.stringify({ collection: tableName, operation: "find", filter: {}, options: { limit: 50 } }, null, 2);
+    const database = path.length > 1 ? path[0] : undefined;
+    return JSON.stringify(
+      {
+        ...(database ? { database } : {}),
+        collection: tableName,
+        operation: "find",
+        filter: {},
+        options: { limit: 50 },
+      },
+      null,
+      2,
+    );
   }
   const table = quoteObjectPath(path, capabilities);
   // Couchbase (SQL++)
@@ -563,8 +574,10 @@ export function generateSelectQuery(
     columns.forEach((c) => {
       projection[c.name] = 1;
     });
+    const database = path.length > 1 ? path[0] : undefined;
     return JSON.stringify(
       {
+        ...(database ? { database } : {}),
         collection: tableName,
         operation: "find",
         filter: {},

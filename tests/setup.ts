@@ -11,6 +11,25 @@ process.env.USER_EMAIL = "user@libredb.org";
 process.env.USER_PASSWORD = "LibreDB.2026";
 process.env.NEXT_PUBLIC_AUTH_PROVIDER = "local";
 (process.env as Record<string, string>).NODE_ENV = "test";
+
+// Polyfill for Bun environments where node:v8 isBuildingSnapshot is not implemented
+const origGetBuiltinModule = (process as unknown as { getBuiltinModule?: (name: string) => unknown }).getBuiltinModule;
+if (typeof origGetBuiltinModule === "function") {
+  Object.defineProperty(process, "getBuiltinModule", {
+    value: (name: string) => {
+      if (name === "v8") {
+        return {
+          startupSnapshot: {
+            isBuildingSnapshot: () => false,
+          },
+        };
+      }
+      return origGetBuiltinModule.call(process, name);
+    },
+    configurable: true,
+    writable: true,
+  });
+}
 /*
   Deleted rather than set, because there is no value that means "the shipped measurements" —
   the variable's own absence is what means it.

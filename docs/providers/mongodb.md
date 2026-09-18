@@ -78,10 +78,11 @@ case 'mongodb': {
 
 `query()` ([`mongodb.ts`](../../src/lib/db/providers/document/mongodb.ts)) accepts a JSON object,
 parsed by `parseQuery()` ([`mongodb.ts`](../../src/lib/db/providers/document/mongodb.ts)), which
-requires `collection` and `operation`:
+requires `collection` and `operation`, with an optional `database` key to target a specific database:
 
 ```json
 { "collection": "users", "operation": "find", "filter": {"age": {"$gt": 18}}, "options": {"limit": 10} }
+{ "database": "analytics", "collection": "events", "operation": "find", "filter": {}, "options": {"limit": 50} }
 { "collection": "orders", "operation": "aggregate", "pipeline": [{"$group": {"_id": "$status", "count": {"$sum": 1}}}] }
 { "collection": "products", "operation": "distinct", "field": "category", "filter": {"active": true} }
 { "collection": "users", "operation": "insertOne", "documents": [{"name": "John"}] }

@@ -626,7 +626,7 @@ describe("MongoDBProvider", () => {
       ).toThrow(DatabaseConfigError);
     });
 
-    test("throws when database is missing and no connectionString", () => {
+    test("database is optional in field mode and does not throw", () => {
       expect(
         () =>
           new MongoDBProvider({
@@ -634,7 +634,7 @@ describe("MongoDBProvider", () => {
             database: undefined,
             connectionString: undefined,
           }),
-      ).toThrow(DatabaseConfigError);
+      ).not.toThrow();
     });
 
     test("connectionString bypasses host/database requirement", () => {
@@ -658,6 +658,12 @@ describe("MongoDBProvider", () => {
     test("carries no query string when no auth database is named", async () => {
       await provider.connect();
       expect(lastMongoUri).toBe("mongodb://localhost:27017/testdb");
+    });
+
+    test("defaults database to test when database is omitted in field mode", async () => {
+      provider = new MongoDBProvider({ ...baseConfig, database: undefined });
+      await provider.connect();
+      expect(lastMongoUri).toBe("mongodb://localhost:27017/test");
     });
 
     test("names the auth database as ?authSource, and percent-encodes it", async () => {
@@ -861,7 +867,7 @@ describe("MongoDBProvider", () => {
       // The keys a runnable command is built from - the ones `parseQuery` reads.
       // `field` is here because a model that cannot see it writes a `distinct` with no
       // field, which is now refused rather than answered with `_id`.
-      for (const key of ["collection", "operation", "filter", "pipeline", "field"]) {
+      for (const key of ["database", "collection", "operation", "filter", "pipeline", "field"]) {
         expect(statementLanguage).toContain(key);
       }
       // The two forms a model reaches for instead, named so they are excluded.
@@ -899,6 +905,24 @@ describe("MongoDBProvider", () => {
       expect(result.executionTime).toBeGreaterThanOrEqual(0);
       // ObjectId should be serialized to string
       expect(typeof result.rows[0]._id).toBe("string");
+    });
+
+    test("find operation targeting explicit database queries from that database", async () => {
+      mockDocumentsByNs["analytics.events"] = [{ _id: new MockObjectId("evt1"), type: "click", count: 42 }];
+      const result = await provider.query(
+        JSON.stringify({ database: "analytics", collection: "events", operation: "find", filter: {} }),
+      );
+      expect(result.rows).toBeArray();
+      expect(result.rows.length).toBe(1);
+      expect(result.rows[0].type).toBe("click");
+      expect(mongoFoundCollections).toContain("analytics.events");
+    });
+
+    test("find operation without explicit database queries from session database", async () => {
+      const result = await provider.query(JSON.stringify({ collection: "users", operation: "find", filter: {} }));
+      expect(result.rows).toBeArray();
+      expect(result.rows.length).toBe(2);
+      expect(mongoFoundCollections).toContain("testdb.users");
     });
 
     test("findOne returns a single document", async () => {
@@ -949,6 +973,18 @@ describe("MongoDBProvider", () => {
 
     test("missing collection throws QueryError", async () => {
       await expect(provider.query(JSON.stringify({ operation: "find" }))).rejects.toThrow();
+    });
+
+    test("query with empty or whitespace database throws QueryError", async () => {
+      await expect(
+        provider.query(JSON.stringify({ database: "   ", collection: "users", operation: "find" })),
+      ).rejects.toThrow(/database/);
+    });
+
+    test("query with non-string database throws QueryError", async () => {
+      await expect(
+        provider.query(JSON.stringify({ database: 12345, collection: "users", operation: "find" })),
+      ).rejects.toThrow(/database/);
     });
   });
 
