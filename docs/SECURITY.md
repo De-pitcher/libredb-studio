@@ -199,9 +199,14 @@ key is persisted beside the SQLite file, in the same directory the Helm chart mo
 close that gap; `postgres` deployments do not share this exposure by default. Full detail in
 [`docs/STORAGE.md`](./STORAGE.md#credential-encryption-at-rest).
 
-**3.2.** `POST /api/admin/audit` is the one writer that reaches the in-app buffer without reaching
-stdout, and that is deliberate: its body is client-supplied, so giving it the authoritative channel
-would let an admin session forge an indistinguishable log line.
+**3.2.** The process stdout log channel (`libredb.audit.v1`) is the authoritative record for all
+server-generated audit events, including boundary denials emitted by `src/proxy.ts` (such as
+`origin_mismatch` and `insufficient_role` redirects). The in-app ring buffer (`GET /api/admin/audit`)
+is a per-process convenience view served by the application runtime and does not receive boundary
+denials recorded by the proxy (which runs in a separately compiled entry); the Admin Audit tab
+explicitly discloses this scope. `POST /api/admin/audit` is the one writer that reaches the in-app
+buffer without reaching stdout, and that is deliberate: its body is client-supplied, so giving it the
+authoritative channel would let an admin session forge an indistinguishable log line.
 
 **3.4.** WRITES are refused by the database itself — a PostgreSQL read-only transaction carrying
 exactly one statement, run by a role verified at open to hold neither superuser nor any

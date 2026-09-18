@@ -267,6 +267,13 @@ function OperationsAudit() {
         <AuditExport disabled={loading || filteredEvents.length === 0} onExport={exportEvents} />
       </div>
 
+      {/* Boundary Denial Channel Disclosure */}
+      <p className="text-xs text-fg-muted leading-relaxed" data-testid="audit-boundary-disclosure">
+        Showing in-memory events recorded by the application runtime. Boundary denials recorded by the proxy (such as
+        origin mismatches and unauthorized route access) are emitted directly to the process log channel (
+        <code className="font-mono text-fg-secondary">libredb.audit.v1</code> on stdout).
+      </p>
+
       {/* Stats Summary */}
       <div className="flex items-center gap-4 text-xs text-fg-muted">
         <span>

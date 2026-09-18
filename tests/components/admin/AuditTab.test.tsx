@@ -132,6 +132,19 @@ describe("AuditTab", () => {
     expect(queryByText("Stats")).not.toBeNull();
   });
 
+  test("discloses that boundary proxy denials are emitted to stdout only", async () => {
+    let renderResult: ReturnType<typeof render>;
+    await act(async () => {
+      renderResult = render(<AuditTab />);
+    });
+    const { getByTestId } = renderResult!;
+    const disclosure = getByTestId("audit-boundary-disclosure");
+    expect(disclosure).not.toBeNull();
+    expect(disclosure.textContent).toContain("libredb.audit.v1");
+    expect(disclosure.textContent).toContain("Boundary denials");
+    expect(disclosure.textContent).toContain("stdout");
+  });
+
   test.each(["csv", "json"])("exports only the filtered operations as %s", async (format) => {
     const event = {
       id: "audit-export",

@@ -502,9 +502,9 @@ function toAuditLine(event: AuditEvent): AuditLogLine {
  * The single entry point for an audit event. It does exactly two things:
  *
  * 1. Pushes to the ring buffer the admin UI reads. That buffer is per process and holds 1000
- *    events, oldest dropped. It is a CONVENIENCE VIEW, not the durable record - an event emitted
- *    from proxy() may land in a different instance than the admin API reads, because the proxy is
- *    a separately compiled entry and instance sharing is unverified.
+ *    events, oldest dropped. It is a CONVENIENCE VIEW, not the durable record — events emitted
+ *    from proxy() (such as boundary permission_denied or origin_mismatch) land in the proxy's
+ *    own runtime instance rather than the application runtime that serves the admin API.
  * 2. Writes one JSON line to stdout. This is the authoritative channel: it works identically in
  *    all 27 distribution channels with no dependency, and it is what a log pipeline consumes.
  *
